@@ -90,14 +90,14 @@ def update_admin_contact(username):
 def list_users():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT username, password, contact FROM users")
+    c.execute("SELECT username, contact FROM users")
     rows = c.fetchall()
     conn.close()
     if not rows:
         print("当前没有用户。")
         return
     for row in rows:
-        print(f"用户名: {row[0]}, 密码: {row[1]}, 联系方式: {row[2]}")
+        print(f"用户名: {row[0]}, 联系方式: {row[1]}")
 
 def delete_user(username):
     conn = sqlite3.connect(DB_FILE)

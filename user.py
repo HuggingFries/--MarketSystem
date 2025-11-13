@@ -1,12 +1,13 @@
-# user.py
 import sqlite3
+import bcrypt
 
 DB_FILE = "market.db"
 
-# === 初始化数据库 ===
+# === 数据库初始化 ===
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    # 用户表
     c.execute("""
         CREATE TABLE IF NOT EXISTS users(
             username TEXT PRIMARY KEY,
@@ -17,21 +18,31 @@ def init_db():
     conn.commit()
     conn.close()
 
+# === 密码加密与校验 ===
+def hash_password(plain_password):
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(plain_password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')  # 存为字符串
+
+def check_password(plain_password, hashed_password):
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
 # === 用户操作 ===
 def register(username, password, contact):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    try:
-        c.execute("INSERT INTO users(username, password, contact) VALUES(?, ?, ?)", 
-                  (username, password, contact))
-        conn.commit()
-        print(f"注册成功，欢迎 {username}！")
-        return True
-    except sqlite3.IntegrityError:
-        print(f"用户 '{username}' 已存在！")
-        return False
-    finally:
+    c.execute("SELECT username FROM users WHERE username=?", (username,))
+    if c.fetchone():
+        print("用户名已存在，请选择其他用户名。")
         conn.close()
+        return False
+    hashed_pw = hash_password(password)
+    c.execute("INSERT INTO users(username, password, contact) VALUES(?,?,?)",
+              (username, hashed_pw, contact))
+    conn.commit()
+    conn.close()
+    print(f"用户 '{username}' 注册成功。")
+    return True
 
 def login(username, password):
     conn = sqlite3.connect(DB_FILE)
@@ -40,55 +51,59 @@ def login(username, password):
     row = c.fetchone()
     conn.close()
     if not row:
-        print("用户不存在！")
+        print("用户名不存在。")
         return False
-    if row[0] != password:
-        print("密码错误！")
+    if check_password(password, row[0]):
+        print("登录成功。")
+        return True
+    else:
+        print("密码错误。")
         return False
-    print(f"登录成功，欢迎回来 {username}！")
-    return True
 
 def show_user(username):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT username, password, contact FROM users WHERE username=?", (username,))
+    c.execute("SELECT username, contact FROM users WHERE username=?", (username,))
     row = c.fetchone()
     conn.close()
-    if not row:
-        print("未找到用户。")
-        return
-    print(f"用户名: {row[0]}")
-    print(f"密码: {row[1]}")
-    print(f"联系方式: {row[2]}")
+    if row:
+        print(f"用户名: {row[0]}")
+        print(f"联系方式: {row[1]}")
+    else:
+        print("未找到用户信息。")
 
 def update_password(username):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    old_pw = input("请输入当前密码: ")
     c.execute("SELECT password FROM users WHERE username=?", (username,))
     row = c.fetchone()
     if not row:
-        print("未找到用户。")
+        print("用户不存在。")
         conn.close()
         return
-    old_password = input("请输入旧密码: ")
-    if old_password != row[0]:
-        print("旧密码错误！")
+    if not check_password(old_pw, row[0]):
+        print("当前密码错误。")
         conn.close()
         return
     while True:
-        new_password1 = input("请输入新密码: ")
-        new_password2 = input("请再次输入新密码: ")
-        if new_password1 != new_password2:
+        new_pw1 = input("请输入新密码: ")
+        new_pw2 = input("请再次输入新密码: ")
+        if new_pw1 != new_pw2:
             print("两次密码不一致，请重新输入。")
         else:
             break
-    c.execute("UPDATE users SET password=? WHERE username=?", (new_password1, username))
+    hashed_pw = hash_password(new_pw1)
+    c.execute("UPDATE users SET password=? WHERE username=?", (hashed_pw, username))
     conn.commit()
     conn.close()
     print("密码已更新。")
 
 def update_contact(username):
     new_contact = input("请输入新的联系方式: ")
+    if not new_contact.strip():
+        print("联系方式不能为空。")
+        return
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("UPDATE users SET contact=? WHERE username=?", (new_contact, username))
@@ -96,50 +111,13 @@ def update_contact(username):
     conn.close()
     print("联系方式已更新。")
 
-# === 命令行交互 ===
-if __name__ == "__main__":
-    init_db()
-    while True:
-        print("\n=== 用户系统 ===")
-        print("1. 注册")
-        print("2. 登录")
-        print("3. 查看用户信息")
-        print("4. 修改密码")
-        print("5. 修改联系方式")
-        print("6. 退出")
-        choice = input("请选择操作: ")
-
-        if choice == "1":
-            username = input("请输入用户名: ")
-            contact = input("请输入联系方式（手机号或微信号）: ")
-            while True:
-                password1 = input("请输入密码: ")
-                password2 = input("请再次输入密码: ")
-                if password1 != password2:
-                    print("两次密码不一致，请重新输入。")
-                else:
-                    break
-            register(username, password1, contact)
-
-        elif choice == "2":
-            username = input("用户名: ")
-            password = input("密码: ")
-            login(username, password)
-
-        elif choice == "3":
-            username = input("要查看的用户名: ")
-            show_user(username)
-
-        elif choice == "4":
-            username = input("请输入用户名: ")
-            update_password(username)
-
-        elif choice == "5":
-            username = input("请输入用户名: ")
-            update_contact(username)
-
-        elif choice == "6":
-            break
-
-        else:
-            print("无效选项，请重试。")
+def delete_user(username):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    # 级联删除用户发布的商品
+    c.execute("DELETE FROM products WHERE seller=?", (username,))
+    # 删除用户自身
+    c.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.commit()
+    conn.close()
+    print(f"用户 '{username}' 及其所有商品已删除。")
