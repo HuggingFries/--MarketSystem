@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "title": "小唐",
+    "description": "吵吵闹闹，还会叫你管理者老爷！快加入购物车吧！",
+    "price": "2147483647",
+    "seller": "vialfish",
+    "contact": "12345678900"
+  },
+  {
+    "id": 2,
+    "title": "数学分析",
+    "description": "只学会了数析，却没拿到学分",
+    "price": "0.1",
+    "seller": "vialfish",
+    "contact": "12345678900"
+  }
+]
